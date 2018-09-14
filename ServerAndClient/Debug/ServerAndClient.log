@@ -1,2 +1,6 @@
-﻿  Server.cpp
-  ServerAndClient.vcxproj -> c:\users\ddronov\source\repos\ServerAndClient\Debug\ServerAndClient.exe
+﻿  stdafx.cpp
+  Client.cpp
+  Server.cpp
+  ServerAndClient.cpp
+  Generating Code...
+  ServerAndClient.vcxproj -> C:\Users\ddronov\source\repos\ServerAndClient\Debug\ServerAndClient.exe

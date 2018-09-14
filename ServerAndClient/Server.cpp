@@ -5,7 +5,8 @@
 
 Server::Server()
 {
-	mySocket s = Initial();
+	UniversalSocket s = Initialize();
+
 	if (s < 0)
 	{
 		cout << "Error with socket initialization\npress any button to close application." << endl;
@@ -14,24 +15,73 @@ Server::Server()
 	}
 
 	cout << "server is running" << endl;
+
 	while (true) {
-		mySocket s2 = GetConnect(s);
+		UniversalSocket s2 = GetConnect(s);
 		if (s2<0)
 		{
 			cout << "failed connection attempt" << endl;
 			continue;
 		}
 		WorkServer(s2);
-		CloseMySocket(s2);
-		cout << "mySocket closed" << endl;
+		CloseUniversalSocket(s2);
+		cout << "UniversalSocket closed" << endl;
 	}
-	CloseMySocket(s);
+
+	CloseUniversalSocket(s);
+
 	Clear();
 }
 
 
 Server::~Server()
 {
+}
+
+UniversalSocket Server::Initialize()
+{
+#ifdef WIN32
+	WORD wVersionRequested;
+	WSADATA wsaData;
+	wVersionRequested = MAKEWORD(2, 2);
+	WSAStartup(wVersionRequested, &wsaData);
+#endif
+
+	UniversalSocket universalSocket = socket(AF_INET, SOCK_STREAM, 0);
+
+	if (universalSocket < 0)
+	{
+		return universalSocket;
+	}
+
+	struct sockaddr_in sockAddrIn;
+
+#ifdef linux
+	memset((char*)&sockAddrIn, '\0', sizeof(sockAddrIn));
+#endif
+
+	sockAddrIn.sin_family = AF_INET;
+	sockAddrIn.sin_port = htons(1280);
+	sockAddrIn.sin_addr.s_addr = htonl(INADDR_ANY);
+
+	int result;
+	result = bind(universalSocket, (struct sockaddr*)&sockAddrIn, sizeof(sockAddrIn));
+
+	if (result < 0)
+	{
+		CloseUniversalSocket(universalSocket);
+		return -1;
+	}
+
+	result = listen(universalSocket, 5);	// 5 is limit value because of limits of winsocket ver1.1
+
+	if (result < 0)
+	{
+		CloseUniversalSocket(universalSocket);
+		return -1;
+	}
+
+	return universalSocket;
 }
 
 void Server::Clear()
@@ -41,29 +91,34 @@ void Server::Clear()
 #endif
 }
 
-void Server::CloseMySocket(mySocket s)
+void Server::CloseUniversalSocket(UniversalSocket universalSocket)
 {
 #ifdef WIN32
-	closesocket(s);
+	closesocket(universalSocket);
 #endif
 #ifdef linux
-	close(s);
+	close(universalSocket);
 #endif
 }
 
-void Server::Download(mySocket s, char* path)
+void Server::Download(UniversalSocket universalSocket, char* path)
 {
 	LARGE_INTEGER freq;
 	LARGE_INTEGER t1, t2;
 	QueryPerformanceFrequency(&freq);
-	int getSize;
-	int sizeFile;
-	if (recv(s, (char*)(&sizeFile), sizeof(sizeFile), 0)<0)
+	int gottenSize;
+	int fileSize;
+
+	int result;
+	result = recv(universalSocket, (char*)(&fileSize), sizeof(fileSize), 0);
+
+	if (result < 0)
 	{
 		cout << "Error retrieving data" << endl;
 		return;
 	}
-	if (sizeFile == -1)
+
+	if (fileSize == -1)
 	{
 		return;
 	}
@@ -72,43 +127,54 @@ void Server::Download(mySocket s, char* path)
 	fopen_s(&file, path, "wb");
 
 	cout << "Download file: " << path << endl;
-	char* b = new char[BUFFER];
-	int sizeDownload = 0;
-	TIMER_START
-		while (sizeDownload < sizeFile)
-		{
 
-			getSize = recv(s, b, BUFFER, 0);
-			if (getSize < 0)
+	char* buffer = new char[BUFFER];
+	int downloadedSize = 0;
+
+	TIMER_START
+
+		while (downloadedSize < fileSize)
+		{
+			gottenSize = recv(universalSocket, buffer, BUFFER, 0);
+
+			if (gottenSize < 0)
 			{
 				cout << "Error retrieving data" << endl;
 				return;
 			}
-			sizeDownload += getSize;
-			fwrite(b, sizeof(char), getSize, file);
+
+			downloadedSize += gottenSize;
+			fwrite(buffer, sizeof(char), gottenSize, file);
 		}
+
 	TIMER_STOP;
+
 	double elapsedTime1 = (float)(t2.QuadPart - t1.QuadPart) / freq.QuadPart;
+
 	cout << "Download finish " << "time: " << elapsedTime1 << endl;
+
 	fclose(file);
 }
 
-void Server::Echo(mySocket s, char* str)
+void Server::Echo(UniversalSocket universalSocket, char* str)
 {
-	if (send(s, str, strlen(str) + 1, 0)<0)
+	if (send(universalSocket, str, strlen(str) + 1, 0)<0)
 	{
 		cout << "Error sending data" << endl;
-		return;
 	}
 }
 
-mySocket Server::GetConnect(mySocket s)
+UniversalSocket Server::GetConnect(UniversalSocket universalSize)
 {
-	sockaddr_in remote_addr;
-	acceptInt size = sizeof(remote_addr);
-	mySocket s2 = accept(s, (struct sockaddr*)&remote_addr, &size);
+	sockaddr_in remoteAddr;
+	acceptInt size = sizeof(remoteAddr);
+	UniversalSocket s2 = accept(universalSize, (struct sockaddr*)&remoteAddr, &size);
+
 	if (s2 < 0)
+	{
 		return -1;
+	}
+		
 #ifdef linux
 	int keepalive = 1;
 	if (setsockopt(s2, SOL_SOCKET, SO_KEEPALIVE, &keepalive, (socklen_t)sizeof(keepalive)) < 0)
@@ -116,82 +182,56 @@ mySocket Server::GetConnect(mySocket s)
 
 		perror("setsockopt(keepalive)");
 	}
+
 	int keepcnt = 1;
-	if (setsockopt(s2, IPPROTO_TCP, TCP_KEEPCNT, &keepcnt, (socklen_t)sizeof(int))<0)
+	if (setsockopt(s2, IPPROTO_TCP, TCP_KEEPCNT, &keepcnt, (socklen_t)sizeof(int)) < 0)
 	{
 
 		perror("setsockopt(keepcnt)");
 	}
+
 	int keepidle = 30;
-	if (setsockopt(s2, IPPROTO_TCP, TCP_KEEPIDLE, &keepidle, (socklen_t)sizeof(int))<0)
+	if (setsockopt(s2, IPPROTO_TCP, TCP_KEEPIDLE, &keepidle, (socklen_t)sizeof(int)) < 0)
 	{
 
 		perror("setsockopt(keepidle)");
 	}
+
 	int keepintvl = 1;
-	if (setsockopt(s2, IPPROTO_TCP, TCP_KEEPINTVL, &keepintvl, (socklen_t)sizeof(int))<0)
+	if (setsockopt(s2, IPPROTO_TCP, TCP_KEEPINTVL, &keepintvl, (socklen_t)sizeof(int)) < 0)
 	{
 		perror("setsockopt(keepalive)");
 	}
 #endif
+
 #ifdef WIN32
-	tcp_keepalive alive;
-	alive.onoff = 1;
-	alive.keepaliveinterval = 3;
-	alive.keepalivetime = 30000;
+	tcp_keepalive tcpKeepAlive;
+	tcpKeepAlive.onoff = 1;
+	tcpKeepAlive.keepaliveinterval = 3;
+	tcpKeepAlive.keepalivetime = 30000;
 	DWORD ret;
-	DWORD Res = WSAIoctl(s, SIO_KEEPALIVE_VALS, &alive, sizeof(alive), NULL, 0, &ret, NULL, NULL);
-	if (Res == SOCKET_ERROR)
+	DWORD error = WSAIoctl(universalSize, SIO_KEEPALIVE_VALS, &tcpKeepAlive, sizeof(tcpKeepAlive), NULL, 0, &ret, NULL, NULL);
+
+	if (error == SOCKET_ERROR)
 	{
 		cout << "error with keepalive" << endl;
 	}
 #endif
+
 	char buf[64];
-	inet_ntop(AF_INET, &remote_addr.sin_addr, (PSTR)(&buf), 64);
+	inet_ntop(AF_INET, &remoteAddr.sin_addr, (PSTR)(&buf), 64);
+
 	cout << "client " << buf << endl;
+
 	return s2;
 }
 
-mySocket Server::Initial()
-{
-#ifdef WIN32
-	WORD wVersionRequested;
-	WSADATA wsaData;
-	wVersionRequested = MAKEWORD(2, 2);
-	WSAStartup(wVersionRequested, &wsaData);
-#endif
-	mySocket s = socket(AF_INET, SOCK_STREAM, 0);
-	if (s<0)
-	{
-		return -1;
-	}
-	struct sockaddr_in local;
-#ifdef linux
-	memset((char*)&local, '\0', sizeof(local));
-#endif
-	local.sin_family = AF_INET;
-	local.sin_port = htons(1280); //htons  - host to network short",ближн€€ св€зь." htonl - host to network long"дальн€€ св€зь.
-								  //преобразование целый чисел в обратный пор€док байт дл€ протокола IP.
-								  //номера портов от 1025-5000. т.к меньше 1025- резерв дл€ telnet и ftp. c большим дл€ других служб.
-	local.sin_addr.s_addr = htonl(INADDR_ANY);
-	int c = bind(s, (struct sockaddr*)&local, sizeof(local));
-	if (c < 0)
-	{
-		CloseMySocket(s);
-		return -1;
-	}
-	int r = listen(s, 5);// 5 is limit value because of limits of winsocket ver1.1
-	if (r < 0)
-	{
-		CloseMySocket(s);
-		return -1;
-	}
 
-	return s;
-}
 
 char** Server::Parsing(char* str)
 {
+	// USE COMMAND CENTER HERE
+	/*
 	char** response;
 	response = new char*[3];
 
@@ -213,22 +253,26 @@ char** Server::Parsing(char* str)
 		count++;
 		i++;
 	} while (str[i - 1] != '\0');
-	return response;
+	return response;*/
 }
 
-void Server::TimeSend(mySocket s)
+void Server::TimeSend(UniversalSocket s)
 {
+	// USE COMMAND CENTER INSTEAD
+	/*
 	char buffer[12];
 	time_t seconds = time(NULL);
 	tm timeinfo;
 	localtime_s(&timeinfo, &seconds);
 	strftime(buffer, 10, "%H:%M:%S", &timeinfo);
 	send(s, buffer, sizeof(buffer), 0);
-	cout << "Time sended on client" << endl;
+	cout << "Time sended on client" << endl;*/
 }
 
-void Server::Upload(mySocket s, char* path)
+void Server::Upload(UniversalSocket s, char* path)
 {
+	// USE COMMAND CENTER INSTEAD
+	/*
 	LARGE_INTEGER freq;
 	LARGE_INTEGER t1, t2;
 	QueryPerformanceFrequency(&freq);
@@ -283,20 +327,23 @@ void Server::Upload(mySocket s, char* path)
 	TIMER_STOP;
 	double elapsedTime1 = (float)(t2.QuadPart - t1.QuadPart) / freq.QuadPart;
 	cout << "\nupload finished " << "time:" << elapsedTime1 << endl;
-	fclose(file);
+	fclose(file);*/
 }
 
-void Server::WorkServer(mySocket s)
+void Server::WorkServer(UniversalSocket s)
 {
+
 	bool flag = true;
 	do
 	{
+		// USE COMMAND CENTER HERE
+		/*
 		char command[128];
 		int getSize;
 		getSize = recv(s, command, sizeof(command), 0);
 		if (getSize == -1)
 		{
-			cout << "The mySocket on the client is closed for an unknown reason" << endl;
+			cout << "The UniversalSocket on the client is closed for an unknown reason" << endl;
 			return;
 		}
 		char** com = Parsing(command);
@@ -308,7 +355,8 @@ void Server::WorkServer(mySocket s)
 		case 'd': Upload(s, com[1]); break;
 		case 'e': Echo(s, com[1]); break;
 		default: break;
+		*/
 		}
 	} while (flag);
-	cout << "client closed mySocket" << endl;
+	cout << "client closed UniversalSocket" << endl;
 }

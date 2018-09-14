@@ -15,7 +15,7 @@
 #include <netinet/in.h>  //
 #include <netdb.h>  //
 #include <memory.h> //
-typedef int mySocket;
+typedef int UniversalSocket;
 #endif
 
 #define BUFFER 1024
@@ -25,7 +25,7 @@ typedef int mySocket;
 #include <Ws2tcpip.h>
 #include <Mstcpip.h>
 #pragma		comment (lib,"ws2_32.lib")
-typedef SOCKET mySocket;
+typedef SOCKET UniversalSocket;
 #endif
 
 using namespace std;
@@ -37,12 +37,12 @@ public:
 	~Client();
 
 	void Clear();
-	void CloseMySocket(mySocket);
-	void Download(mySocket, char*);
-	int GetRes(mySocket);
-	mySocket Initial();
+	void CloseUniversalSocket(UniversalSocket);
+	void Download(UniversalSocket, char*);
+	int GetRes(UniversalSocket);
+	UniversalSocket Initial();
 	char** Parsing(char*);
-	void Upload(mySocket, char*);
-	void WorkClient(mySocket);
+	void Upload(UniversalSocket, char*);
+	void WorkClient(UniversalSocket);
 };
 

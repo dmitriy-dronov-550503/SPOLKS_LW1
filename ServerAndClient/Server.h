@@ -20,7 +20,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
-typedef int mySocket;
+typedef int UniversalSocket;
 typedef unsigned int acceptInt;
 #endif
 #ifdef _WIN32
@@ -28,7 +28,7 @@ typedef unsigned int acceptInt;
 #include <Ws2tcpip.h>
 #include <Mstcpip.h>
 #pragma		comment (lib,"ws2_32.lib")
-typedef SOCKET mySocket;
+typedef SOCKET UniversalSocket;
 typedef int acceptInt;
 #endif
 using namespace std;
@@ -39,15 +39,16 @@ public:
 	Server();
 	~Server();
 
+	UniversalSocket Initialize();
+
 	void Clear();
-	void CloseMySocket(mySocket);
-	void Download(mySocket, char*);
-	void Echo(mySocket, char*);
-	mySocket GetConnect(mySocket);
-	mySocket Initial();
-	char** Parsing(char*);
-	void TimeSend(mySocket);
-	void Upload(mySocket, char*);
-	void WorkServer(mySocket);
+	void CloseUniversalSocket(UniversalSocket s);
+	void Download(UniversalSocket s, char* path);
+	void Echo(UniversalSocket s, char* str);
+	UniversalSocket GetConnect(UniversalSocket s);
+	char** Parsing(char* str);
+	void TimeSend(UniversalSocket s);
+	void Upload(UniversalSocket s, char* path);
+	void WorkServer(UniversalSocket s);
 };
 

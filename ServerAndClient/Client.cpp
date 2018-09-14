@@ -4,11 +4,11 @@
 
 Client::Client()
 {
-	mySocket s = Initial();
+	UniversalSocket s = Initial();
 	if (s != -1)
 	{
 		WorkClient(s);
-		CloseMySocket(s);
+		CloseUniversalSocket(s);
 	}
 	else
 	{
@@ -30,7 +30,7 @@ void Client::Clear()
 #endif
 }
 
-void Client::CloseMySocket(mySocket s)
+void Client::CloseUniversalSocket(UniversalSocket s)
 {
 #ifdef WIN32
 	closesocket(s);
@@ -41,7 +41,7 @@ void Client::CloseMySocket(mySocket s)
 #endif
 }
 
-void Client::Download(mySocket s, char* path)
+void Client::Download(UniversalSocket s, char* path)
 {
 	int getSize;
 	int sizeFile;
@@ -75,7 +75,7 @@ void Client::Download(mySocket s, char* path)
 	fclose(file);
 }
 
-int Client::GetRes(mySocket s)
+int Client::GetRes(UniversalSocket s)
 {
 	char buffer[128];
 	if (recv(s, buffer, sizeof(buffer), 0)<0)
@@ -87,7 +87,7 @@ int Client::GetRes(mySocket s)
 	return 1;
 }
 
-mySocket Client::Initial()
+UniversalSocket Client::Initial()
 {
 #ifdef WIN32
 	WORD wVersionRequested;
@@ -103,7 +103,7 @@ mySocket Client::Initial()
 	peer.sin_family = AF_INET;
 	peer.sin_port = htons(1280);
 	inet_pton(AF_INET, inet_address.c_str(), &peer.sin_addr.s_addr);
-	mySocket s = socket(AF_INET, SOCK_STREAM, 0);
+	UniversalSocket s = socket(AF_INET, SOCK_STREAM, 0);
 	if (s<0)
 	{
 		cout << "Socket Error" << endl;
@@ -155,7 +155,7 @@ mySocket Client::Initial()
 		return s;
 	}
 	cout << "connect error" << endl;
-	CloseMySocket(s);
+	CloseUniversalSocket(s);
 	return -1;
 }
 
@@ -184,7 +184,7 @@ char** Client::Parsing(char* str)
 	return response;
 }
 
-void Client::Upload(mySocket s, char* path)
+void Client::Upload(UniversalSocket s, char* path)
 {
 	char* outbuffer = new char[BUFFER + 1];
 	char *b = new char[BUFFER];
@@ -237,7 +237,7 @@ void Client::Upload(mySocket s, char* path)
 	fclose(file);
 }
 
-void Client::WorkClient(mySocket s)
+void Client::WorkClient(UniversalSocket s)
 {
 	bool flag = true;
 	do
